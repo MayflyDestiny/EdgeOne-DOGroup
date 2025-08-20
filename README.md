@@ -1,5 +1,9 @@
 # EdgeOne Dynamic Origin
 
+<img src="https://img.shields.io/docker/automated/tsund/tianchi_docker_practice.svg"/>
+<img src="https://img.shields.io/docker/image-size/mayflydestiny/edgeone-origin-hacked"/>
+
+
 EdgeOne 是腾讯云的边缘安全加速平台。该脚本为其提供动态更新源站组 IP 的功能。
 此功能特别适用于那些 IP 地址可能会变化的源站，确保 CDN 始终能够正确地获取最新的内容。比如仅有动态 IPV6 地址的服务器，
 也能够长期稳定部署WEB服务，而不必使用 frp / ngork 等内网端口转发工具。
