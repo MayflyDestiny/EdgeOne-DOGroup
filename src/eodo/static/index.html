@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EdgeOne Dynamic Origin 控制台</title>
+  <link href="https://unpkg.com/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+  <style>
+    body { background: #f4f7fa; }
+    .page-center { max-width: 800px; margin: 27px auto; }
+    .tabler-logo {font-size: 1.6rem;font-weight:700;color:#206bc4;margin-bottom:22px;letter-spacing:0.03em;}
+    #logs-modal-pre { min-height:170px; max-height:400px; overflow:auto; font-family:monospace; font-size:1.05em; background:#f7fafb; color: #222;}
+    .mb-4 {margin-bottom:1.4rem;}
+    .card-header {font-weight:bold;}
+    .table thead th {background:#f4f6fb;}
+    .table-vcenter td, .table-vcenter th {vertical-align:middle;}
+    .card .card-body {padding-top: 1.1rem; padding-bottom:1.1rem;}
+    .btn-del {padding:2px 10px;}
+    .form-section-hd {font-size:1.12em;margin-bottom:7px;font-weight:600;}
+    .ipv6-checkbox-list {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .ipv6-checkbox-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem;
+      margin-bottom: 0.25rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      border-radius: 0.25rem;
+      border: 1px solid #e9ecef;
+      background: #fff;
+    }
+    .ipv6-checkbox-item:hover {
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+    }
+    .ipv6-checkbox-left {
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+    .ipv6-checkbox-item input[type="checkbox"] {
+      margin-right: 0.5rem;
+      transform: scale(1.1);
+    }
+    .ipv6-checkbox-item label {
+      margin: 0;
+      cursor: pointer;
+      color: #495057;
+      flex: 1;
+    }
+    .ipv6-status {
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.25rem;
+      margin-left: 0.5rem;
+    }
+    .ipv6-status.connected {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .ipv6-status.disconnected {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .ipv6-status.checking {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .ipv6-status.unknown {
+      background-color: #e2e3e5;
+      color: #6c757d;
+      border: 1px solid #ced4da;
+    }
+  </style>
+</head>
+<body>
+<div class="page page-center">
+  <div class="tabler-logo text-center mb-3">EdgeOne Dynamic Origin 控制台</div>
+  <!-- 状态卡片 -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <div class="card-title">服务状态</div>
+    </div>
+    <div class="card-body">
+      <div id="status" class="mb-2">加载中...</div>
+      <div>
+        <button class="btn btn-blue" onclick="fetchStatus()">刷新状态</button>
+        <button class="btn btn-outline-green m-1" onclick="runTask();">立即执行任务</button>
+        <button type="button" class="btn btn-outline-info m-1" id="IPv6ValidityToggleBtn" onclick="toggleIPv6Validity()">
+          <span id="IPv6ValidityStatus">IPv6检测: 关闭</span>
+        </button>
+        <button type="button" class="btn btn-outline-success m-1" id="IPv6ServiceToggleBtn" onclick="toggleIPv6Service()">
+          <span id="IPv6ServiceStatus">IPv6同步: 停止</span>
+        <button class="btn btn-outline-secondary m-1" data-bs-toggle="modal" data-bs-target="#logModal" onclick="openLogModal()">
+          查看日志
+        </button>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调度周期卡片 -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <div class="card-title">调度周期设置</div>
+    </div>
+    <div class="card-body">
+      <div class="input-group w-50">
+        <span class="input-group-text">周期(分钟)</span>
+        <input type="number" id="interval" class="form-control" min="1" value="15">
+        <button class="btn btn-primary" onclick="setIntervalM();">修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IPv6配置卡片 -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <div class="card-title">IPv6地址配置</div>
+    </div>
+    <div class="card-body">
+      <!-- 隐藏的IPv6检测开关，用于保持兼容性 -->
+      <input type="checkbox" id="IPv6ValidityCheck" name="IPv6ValidityCheck" style="display: none;">
+      
+      <!-- IPv6选择模式 -->
+      <div class="mb-3">
+        <label class="form-label">IPv6地址选择模式</label>
+        <div class="d-flex gap-3">
+          <div class="dropdown">
+            <button class="btn btn-outline-primary dropdown-toggle" type="button" id="ipv6ModeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              自动选择
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="ipv6ModeDropdown">
+              <li><a class="dropdown-item" href="#" onclick="setIPv6Mode('auto')">自动选择</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setIPv6Mode('manual')">手动选择</a></li>
+            </ul>
+          </div>
+          <div class="input-group w-50">
+            <span class="input-group-text">EdgeOne源站组名称</span>
+            <input type="text" id="edgeoneGroupName" class="form-control" value="edgeone" placeholder="edgeone">
+            <button class="btn btn-primary" onclick="setEdgeOneGroupName();">修改</button>
+          </div>
+        </div>
+        <div class="form-text">自动选择：使用所有检测到的IPv6地址；手动选择：从列表中选择特定地址</div>
+      </div>
+      
+      <!-- 手动选择IPv6列表 -->
+      <div id="ipv6-manual-section" class="mb-3" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0">IPv6地址列表</label>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="detectIPv6Addresses()">
+            检测IPv6地址
+          </button>
+        </div>
+        <div id="ipv6-list" class="ipv6-checkbox-list">
+          <div class="text-muted text-center py-3">点击"检测IPv6地址"按钮开始检测</div>
+        </div>
+        <div class="mt-2">
+          <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="selectAllIPv6(true)">全选</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllIPv6(false)">取消全选</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 配置管理 -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <span class="card-title">配置管理</span>
+    </div>
+    <div class="card-body">
+      <form id="configForm" autocomplete="off">
+        <!-- 腾讯云密钥 -->
+        <div class="form-section-hd">腾讯云密钥配置</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label required">SecretId</label>
+            <input class="form-control" type="text" name="SecretId" id="SecretId" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label required">SecretKey</label>
+            <input class="form-control" type="password" name="SecretKey" id="SecretKey" required>
+          </div>
+        </div>
+        <!-- EdgeOne站点配置 -->
+        <div class="form-section-hd">EdgeOne 站点配置</div>
+        <div class="mb-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="addEdgeOneRow()">增加站点</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table table-vcenter table-bordered mb-3" id="EdgeOneTable">
+            <thead>
+              <tr>
+                <th>ZoneID</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
+        </div>
+        <!-- DnsPod记录配置 -->
+        <div class="form-section-hd">DnsPod 记录配置</div>
+        <div class="mb-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="addDnsRow()">增加记录</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table table-vcenter table-striped table-bordered mb-3" id="DnsPodTable">
+            <thead>
+              <tr>
+                <th>子域名</th>
+                <th>记录类型</th>
+                <th>主域名</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
+        </div>
+        <!-- 钉钉机器人 -->
+        <div class="form-section-hd">钉钉机器人配置</div>
+        <div class="mb-3">
+          <input class="form-control" type="text" name="DingTalkWebhook" id="DingTalkWebhook" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
+        </div>
+      
+        
+        <!-- 网络接口/提交 -->
+        <div class="row">
+          <div class="col-md-4 mb-2">
+            <label class="form-label">选择网络接口</label>
+            <select class="form-select" name="SelectIface" id="SelectIface"></select>
+          </div>
+          <div class="col-md-8 text-end align-self-end d-flex gap-1 justify-content-end align-items-center">
+            <button type="submit" class="btn btn-success" id="submitConfig">
+              保存配置
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 日志模态窗口 -->
+<div class="modal modal-blur fade" id="logModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">最近任务日志</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="logs-modal-pre">加载中...</pre>
+        <div class="d-flex justify-content-between mt-1">
+          <span></span>
+          <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="clearLogs();">清空日志</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="fetchLogsModal();">手动刷新</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast提示 -->
+<div id="toast" style="
+  display:none;position:fixed;left:50%;bottom:54px;min-width:160px;
+  background:#206bc4;color:#fff;padding:14px 28px;
+  border-radius:8px;z-index:10;font-size:1.08em;transform:translateX(-50%);
+  box-shadow:0 2px 16px #206bc40a;letter-spacing:0.02em;">TOAST
+</div>
+
+<script src="https://unpkg.com/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script>
+// --- Toast ---
+function showToast(msg, timeout=2200){
+    let t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.display="block";
+    clearTimeout(t._hid);
+    t._hid = setTimeout(()=>{t.style.display="none"}, timeout);
+}
+
+// 状态
+function fetchStatus(showLoading = true){
+    let dom = document.getElementById('status');
+    if (showLoading) {
+        dom.innerHTML = '<span class="text-muted">更新中...</span>';
+    }
+    
+    // 获取任务状态和服务状态
+    Promise.all([
+        fetch('/api/status').then(r=>r.json()),
+        fetch('/api/service-status').then(r=>r.json())
+    ]).then(([taskRes, serviceRes]) => {
+        const newContent = `
+            <b>任务ID:</b> ${taskRes.id||'未知'}<br>
+            <b>任务时间:</b> ${taskRes.time||''}<br>
+            <b>任务状态:</b> <span class="badge ${taskRes.result==='异常'?'bg-red':(taskRes.result==='结束'?'bg-green':'bg-blue')}">
+            ${taskRes.result||'未知'}</span><br>
+            <b>同步服务:</b> <span class="badge ${serviceRes.running?'bg-green':'bg-red'}">
+            ${serviceRes.running?'运行中':'已停止'}</span> 
+            <small class="text-muted">(${serviceRes.interval}分钟)</small>
+        `;
+        // 只有内容发生变化时才更新DOM，避免闪烁
+        if (dom.innerHTML !== newContent) {
+            dom.innerHTML = newContent;
+        }
+        
+        // 更新IPv6同步服务按钮状态
+        updateIPv6ServiceButton(serviceRes.running);
+    }).catch(()=>{ 
+        const errorContent = '<span class="text-danger">获取失败</span>';
+        if (dom.innerHTML !== errorContent) {
+            dom.innerHTML = errorContent;
+        }
+    });
+}
+
+// 周期
+function setIntervalM(){
+    let v = Number(document.getElementById('interval').value);
+    document.getElementById('interval').disabled = true;
+    fetch('/api/interval', {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({interval:v})})
+        .then(res=>res.json()).then(d=>{
+            showToast(d.msg||"设置完成");
+            document.getElementById('interval').disabled = false;
+            fetchConfig();
+        })
+        .catch(()=>{
+            showToast("设置失败",2500);
+            document.getElementById('interval').disabled = false;
+        });
+}
+// ------ EdgeOne 配置 表格
+function addEdgeOneRow(val="") {
+  let tb = document.getElementById("EdgeOneTable").getElementsByTagName("tbody")[0];
+  let tr = tb.insertRow();
+  let td0 = tr.insertCell(); td0.innerHTML = `<input type="text" class="form-control" value="${val}">`;
+  let td1 = tr.insertCell(); td1.innerHTML = `<button type="button" class="btn btn-link text-danger btn-del" onclick="this.closest('tr').remove()">移除</button>`;
+}
+function setEdgeOneTable(arr) {
+  let tb = document.getElementById("EdgeOneTable").getElementsByTagName("tbody")[0];
+  tb.innerHTML = "";
+  (arr||[]).forEach(val=>addEdgeOneRow(val));
+}
+function getEdgeOneZoneArr() {
+  let tb = document.getElementById("EdgeOneTable").getElementsByTagName("tbody")[0];
+  return Array.from(tb.querySelectorAll("tr")).map(tr=>tr.cells[0].querySelector("input").value.trim()).filter(Boolean);
+}
+
+// ------ DnsPod 配置 表格
+function addDnsRow(sub="",typ="AAAA",root="") {
+  let tb = document.getElementById("DnsPodTable").getElementsByTagName("tbody")[0];
+  let tr = tb.insertRow();
+  tr.insertCell().innerHTML = `<input type="text" class="form-control" value="${sub}">`;
+  tr.insertCell().innerHTML = `<select class="form-select" disabled><option value="AAAA">AAAA</option></select>`;
+  tr.insertCell().innerHTML = `<input type="text" class="form-control" value="${root}">`;
+  tr.insertCell().innerHTML = `<button type="button" class="btn btn-link text-danger btn-del" onclick="this.closest('tr').remove()">移除</button>`;
+}
+function setDnsPodTable(arr) {
+  let tb = document.getElementById("DnsPodTable").getElementsByTagName("tbody")[0];
+  tb.innerHTML = "";
+  (arr||[]).forEach(str=>{
+    let [sub,type,root] = (str+"||").split("|");
+    addDnsRow(sub, "AAAA", root||"");
+  });
+}
+function getDnsPodRecordArr() {
+  let tb = document.getElementById("DnsPodTable").getElementsByTagName("tbody")[0];
+  return Array.from(tb.querySelectorAll("tr"))
+      .map(tr=>{
+        let sub = tr.cells[0].querySelector("input").value.trim();
+        let typ = "AAAA";
+        let root = tr.cells[2].querySelector("input").value.trim();
+        return sub && root ? `${sub}|${typ}|${root}` : null;
+      }).filter(Boolean);
+}
+
+// ---- IPv6配置功能 ----
+let currentIPv6Mode = 'auto';
+
+// 设置IPv6选择模式
+function setIPv6Mode(mode) {
+    currentIPv6Mode = mode;
+    const dropdown = document.getElementById('ipv6ModeDropdown');
+    const manualSection = document.getElementById('ipv6-manual-section');
+    
+    if (mode === 'auto') {
+        dropdown.textContent = '自动选择';
+        manualSection.style.display = 'none';
+    } else {
+        dropdown.textContent = '手动选择';
+        manualSection.style.display = 'block';
+    }
+    
+    showToast(mode === 'auto' ? '已切换到自动选择模式' : '已切换到手动选择模式');
+}
+
+// IPv6地址检测功能
+function detectIPv6Addresses() {
+    showToast("正在检测IPv6地址...");
+    const ipv6List = document.getElementById('ipv6-list');
+    ipv6List.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm me-2"></div>正在检测IPv6地址...</div>';
+    
+    fetch('/api/detect-ipv6').then(r => r.json()).then(res => {
+        if (res.addresses && res.addresses.length > 0) {
+            let html = '';
+            
+            // 如果连通性检测失败，显示警告信息
+            if (res.connectivity_failed) {
+                html += '<div class="alert alert-warning mb-3" role="alert">';
+                html += '<i class="fas fa-exclamation-triangle me-2"></i>';
+                html += '连通性检测超时，以下为检测到的IPv6地址（连通性未验证）';
+                html += '</div>';
+            }
+            
+            res.addresses.forEach((addr, index) => {
+                html += `
+                <div class="ipv6-checkbox-item">
+                    <div class="ipv6-checkbox-left">
+                        <input type="checkbox" id="ipv6_${index}" name="selectedIPv6" value="${addr}" checked>
+                        <label for="ipv6_${index}">${addr}</label>
+                    </div>
+                    <div class="ipv6-status ${res.connectivity_failed ? 'unknown' : 'checking'}" id="status_${index}">${res.connectivity_failed ? '未验证' : '检测中...'}</div>
+                </div>`;
+            });
+            
+            ipv6List.innerHTML = html;
+            
+            // 添加复选框状态变化监听
+            document.querySelectorAll('input[name="selectedIPv6"]').forEach(cb => {
+                cb.addEventListener('change', updateIPv6Selection);
+            });
+            
+            // 只有在连通性检测未失败时才进行连通性检查
+            if (!res.connectivity_failed) {
+                res.addresses.forEach((addr, index) => {
+                    checkIPv6Connectivity(addr, index);
+                });
+            }
+            
+            const statusMsg = res.connectivity_failed ? 
+                `检测完成，找到 ${res.addresses.length} 个IPv6地址（连通性未验证）` : 
+                `检测完成，找到 ${res.addresses.length} 个IPv6地址`;
+            showToast(statusMsg);
+        } else {
+            ipv6List.innerHTML = '<div class="text-warning text-center py-3">未检测到IPv6地址</div>';
+            showToast("未检测到IPv6地址", 2500);
+        }
+    }).catch(() => {
+        showToast("IPv6地址检测失败", 2500);
+        ipv6List.innerHTML = '<div class="text-danger text-center py-3">检测失败，请重试</div>';
+    });
+}
+
+// 检测IPv6地址连通性
+function checkIPv6Connectivity(address, index) {
+    const statusElement = document.getElementById(`status_${index}`);
+    
+    // 模拟连通性检测（实际应该调用后端API）
+    setTimeout(() => {
+        // 这里应该调用实际的连通性检测API
+        // 暂时使用随机结果模拟
+        const isConnected = Math.random() > 0.3; // 70%概率连通
+        
+        if (isConnected) {
+            statusElement.className = 'ipv6-status connected';
+            statusElement.textContent = '连通';
+        } else {
+            statusElement.className = 'ipv6-status disconnected';
+            statusElement.textContent = '不通';
+        }
+    }, Math.random() * 2000 + 500); // 0.5-2.5秒随机延迟
+}
+
+// 更新IPv6选择状态
+function updateIPv6Selection() {
+    const selectedCount = document.querySelectorAll('input[name="selectedIPv6"]:checked').length;
+    const totalCount = document.querySelectorAll('input[name="selectedIPv6"]').length;
+    
+    if (selectedCount === 0) {
+        showToast('请至少选择一个IPv6地址', 1500);
+    }
+}
+
+// 全选/取消全选IPv6地址
+function selectAllIPv6(selectAll) {
+    document.querySelectorAll('input[name="selectedIPv6"]').forEach(cb => {
+        cb.checked = selectAll;
+    });
+    showToast(selectAll ? "已全选" : "已取消全选");
+}
+
+// IPv6有效性检测开关变化处理
+function handleIPv6ValidityToggle() {
+    const checkbox = document.getElementById('IPv6ValidityCheck');
+    const isEnabled = checkbox.checked;
+    
+    if (isEnabled) {
+        showToast('已启用IPv6地址有效性检测');
+    } else {
+        showToast('已禁用IPv6地址有效性检测');
+    }
+    
+    // 更新button样式
+    updateIPv6ValidityButton(isEnabled);
+}
+
+// 切换IPv6有效性检测（button样式）
+function toggleIPv6Validity() {
+    const checkbox = document.getElementById('IPv6ValidityCheck');
+    checkbox.checked = !checkbox.checked;
+    
+    // 触发change事件以保持兼容性
+    checkbox.dispatchEvent(new Event('change'));
+    
+    // 保存配置
+    const config = { IPv6ValidityCheck: checkbox.checked };
+    fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    }).then(res => res.json()).then(data => {
+        showToast(data.msg || '配置已保存');
+    }).catch(() => {
+        showToast('配置保存失败', 2500);
+    });
+}
+
+// 更新IPv6有效性检测button的显示状态
+function updateIPv6ValidityButton(isEnabled) {
+    const button = document.getElementById('IPv6ValidityToggleBtn');
+    const status = document.getElementById('IPv6ValidityStatus');
+    
+    if (isEnabled) {
+        button.className = 'btn btn-success m-1';
+        status.textContent = 'IPv6检测: 开启';
+    } else {
+        button.className = 'btn btn-outline-info m-1';
+        status.textContent = 'IPv6检测: 关闭';
+    }
+}
+
+// 更新IPv6同步服务按钮状态
+function updateIPv6ServiceButton(isRunning) {
+    const button = document.getElementById('IPv6ServiceToggleBtn');
+    const statusSpan = document.getElementById('IPv6ServiceStatus');
+    
+    if (isRunning) {
+        button.className = 'btn btn-success m-1';
+        statusSpan.textContent = 'IPv6同步: 运行中';
+    } else {
+        button.className = 'btn btn-outline-success m-1';
+        statusSpan.textContent = 'IPv6同步: 已停止';
+    }
+}
+
+// 切换IPv6同步服务状态
+function toggleIPv6Service() {
+    const button = document.getElementById('IPv6ServiceToggleBtn');
+    const statusSpan = document.getElementById('IPv6ServiceStatus');
+    const isCurrentlyRunning = button.className.includes('btn-success');
+    
+    // 禁用按钮防止重复点击
+    button.disabled = true;
+    statusSpan.textContent = isCurrentlyRunning ? '正在停止...' : '正在启动...';
+    
+    const action = isCurrentlyRunning ? 'stop' : 'start';
+    
+    fetch('/api/service-control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action })
+    }).then(res => res.json()).then(data => {
+        if (data.error) {
+            showToast(data.msg || '操作失败', 2500);
+        } else {
+            showToast(data.msg || '操作成功');
+            // 刷新状态
+            fetchStatus(false);
+        }
+    }).catch(() => {
+        showToast('操作失败，请重试', 2500);
+        // 恢复按钮状态
+        updateIPv6ServiceButton(isCurrentlyRunning);
+    }).finally(() => {
+        button.disabled = false;
+    });
+}
+
+// 设置EdgeOne源站组名称
+function setEdgeOneGroupName() {
+    const groupName = document.getElementById('edgeoneGroupName').value.trim();
+    if (!groupName) {
+        showToast('EdgeOne源站组名称不能为空', 2500);
+        return;
+    }
+    
+    const data = { EdgeOneGroupName: groupName };
+    fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(res => res.json()).then(data => {
+        showToast(data.msg || 'EdgeOne源站组名称已保存');
+    }).catch(() => {
+        showToast('EdgeOne源站组名称保存失败', 2500);
+    });
+}
+
+// ---- 配置  ----
+function fetchConfig(){
+    fetch('/api/config').then(r=>r.json()).then(res=>{
+        document.getElementById('SecretId').value = res?.TencentCloud?.SecretId||"";
+        document.getElementById('SecretKey').value = res?.TencentCloud?.SecretKey||"";
+        setEdgeOneTable(Array.isArray(res?.EdgeOneZoneId) ? res.EdgeOneZoneId : (typeof res.EdgeOneZoneId==="string"?[res.EdgeOneZoneId] : []));
+        setDnsPodTable(Array.isArray(res?.DnsPodRecord) ? res.DnsPodRecord : (typeof res.DnsPodRecord==="string"?[res.DnsPodRecord] : []));
+        document.getElementById('DingTalkWebhook').value = res?.DingTalkWebhook||"";
+        
+        // EdgeOne源站组名称配置
+        document.getElementById('edgeoneGroupName').value = res?.EdgeOneGroupName||"edgeone";
+        
+        // IPv6配置
+        const ipv6ValidityCheck = res?.IPv6ValidityCheck || false;
+        document.getElementById('IPv6ValidityCheck').checked = ipv6ValidityCheck;
+        updateIPv6ValidityButton(ipv6ValidityCheck);
+        
+        // 设置IPv6选择模式
+        const ipv6Mode = res?.IPv6SelectMode || 'auto';
+        setIPv6Mode(ipv6Mode);
+        
+        // 如果是手动模式，自动检测IPv6地址并恢复选择状态
+        if (ipv6Mode === 'manual') {
+            // 先检测IPv6地址
+            fetch('/api/detect-ipv6').then(r => r.json()).then(ipv6Res => {
+                if (ipv6Res.addresses && ipv6Res.addresses.length > 0) {
+                    let html = '';
+                    ipv6Res.addresses.forEach((addr, index) => {
+                        const isSelected = res?.SelectedIPv6Addresses && res.SelectedIPv6Addresses.includes(addr);
+                        html += `
+                        <div class="ipv6-checkbox-item">
+                            <div class="ipv6-checkbox-left">
+                                <input type="checkbox" id="ipv6_${index}" name="selectedIPv6" value="${addr}" ${isSelected ? 'checked' : ''}>
+                                <label for="ipv6_${index}">${addr}</label>
+                            </div>
+                            <div class="ipv6-status checking" id="status_${index}">检测中...</div>
+                        </div>`;
+                    });
+                    
+                    const ipv6List = document.getElementById('ipv6-list');
+                    ipv6List.innerHTML = html;
+                    
+                    // 添加复选框状态变化监听
+                    document.querySelectorAll('input[name="selectedIPv6"]').forEach(cb => {
+                        cb.addEventListener('change', updateIPv6Selection);
+                    });
+                    
+                    // 开始检测每个IPv6地址的连通性
+                    ipv6Res.addresses.forEach((addr, index) => {
+                        checkIPv6Connectivity(addr, index);
+                    });
+                } else {
+                    const ipv6List = document.getElementById('ipv6-list');
+                    ipv6List.innerHTML = '<div class="text-warning text-center py-3">未检测到IPv6地址</div>';
+                }
+            }).catch(() => {
+                const ipv6List = document.getElementById('ipv6-list');
+                ipv6List.innerHTML = '<div class="text-danger text-center py-3">检测失败，请重试</div>';
+            });
+        }
+        
+        if(res.IntervalMin) document.getElementById('interval').value = res.IntervalMin;
+        fetch('/api/iface').then(r=>r.json()).then(ifaces=>{
+            let sel = document.getElementById('SelectIface');
+            sel.innerHTML = "";
+            ifaces.forEach(i=>{
+                let o = document.createElement('option');
+                o.value = o.textContent = i;
+                if(res.SelectIface==i)o.selected=true;
+                sel.appendChild(o);
+            });
+        });
+    }).catch(()=>{showToast("配置加载失败",2200);});
+}
+document.getElementById('configForm').onsubmit = function(e){
+    e.preventDefault();
+    
+    // 获取选中的IPv6地址
+    let selectedIPv6 = [];
+    if(currentIPv6Mode === 'manual'){
+        selectedIPv6 = Array.from(document.querySelectorAll('input[name="selectedIPv6"]:checked')).map(cb => cb.value);
+        
+        // 验证手动模式下是否选择了地址
+        if(selectedIPv6.length === 0 && document.querySelectorAll('input[name="selectedIPv6"]').length > 0){
+            showToast('手动选择模式下请至少选择一个IPv6地址', 2500);
+            return;
+        }
+    }
+    
+    let data = {
+      TencentCloud: {
+        SecretId: this.SecretId.value.trim(),
+        SecretKey: this.SecretKey.value.trim()
+      },
+      EdgeOneZoneId: getEdgeOneZoneArr(),
+      DnsPodRecord: getDnsPodRecordArr(),
+      DingTalkWebhook: this.DingTalkWebhook.value.trim(),
+      SelectIface: this.SelectIface.value,
+      IntervalMin: Number(document.getElementById('interval').value)||15,
+      IPv6ValidityCheck: document.getElementById('IPv6ValidityCheck').checked,
+      IPv6SelectMode: currentIPv6Mode,
+      SelectedIPv6Addresses: selectedIPv6,
+      EdgeOneGroupName: document.getElementById('edgeoneGroupName').value.trim() || 'edgeone'
+    };
+    document.getElementById('submitConfig').disabled = true;
+    fetch('/api/config', {
+        method: "POST", headers: {"content-type":"application/json"},
+        body: JSON.stringify(data)
+      }).then(r=>r.json()).then(d=>{
+         showToast(d.msg||"配置已保存");
+         fetchConfig();
+         document.getElementById('submitConfig').disabled = false;
+      }).catch(()=>{
+         showToast("提交失败",2300);
+         document.getElementById('submitConfig').disabled = false;
+      });
+};
+// ---- 日志模态 ----
+function fetchLogsModal(){
+    let logsdom = document.getElementById('logs-modal-pre');
+    logsdom.textContent = "加载中...";
+    fetch('/api/logs').then(r=>r.json()).then(res=>{
+        logsdom.textContent = res.logs||"无日志";
+    }).catch(()=>{logsdom.textContent="日志加载失败";});
+}
+function clearLogs(){
+    if(confirm('确定要清空所有日志吗？此操作不可恢复。')){
+        fetch('/api/clear-logs', {method: 'POST'})
+        .then(r=>r.json())
+        .then(res=>{
+            showToast(res.msg || '日志已清空');
+            fetchLogsModal(); // 刷新日志显示
+        })
+        .catch(()=>{
+            showToast('清空日志失败');
+        });
+    }
+}
+function openLogModal(){
+    fetchLogsModal();
+    if(openLogModal._timer) clearInterval(openLogModal._timer);
+    openLogModal._timer = setInterval(fetchLogsModal, 9000);
+    let modal = document.getElementById('logModal');
+    modal.addEventListener('hidden.bs.modal', ()=>{
+        if(openLogModal._timer){ clearInterval(openLogModal._timer); openLogModal._timer = null; }
+    }, {once: true});
+}
+
+// ---- runTask
+function runTask(){
+    showToast("任务启动中...");
+    fetch('/api/run-task', {method:"POST"}).then(_=>{
+        fetchStatus();
+        showToast("任务已触发，请稍后查看结果。");
+    }).catch(()=>{showToast("执行失败",2500);});
+}
+window.onload = function(){
+    fetchStatus();
+    fetchConfig();
+    setInterval(()=>fetchStatus(false), 4000); // 定时刷新时不显示加载状态，避免闪烁
+    
+    // 添加IPv6检测开关事件监听
+    document.getElementById('IPv6ValidityCheck').addEventListener('change', handleIPv6ValidityToggle);
+}
+</script>
+</body>
+</html>

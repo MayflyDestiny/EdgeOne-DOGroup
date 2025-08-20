@@ -1,0 +1,19 @@
+/.venv/
+/uv.lock
+.idea
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+.env
