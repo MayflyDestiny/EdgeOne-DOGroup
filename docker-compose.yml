@@ -3,7 +3,7 @@ version: '3.8'
 services:
   eodo:
     build: .
-    container_name: edgeone-dynamic-origin
+    container_name: edgeone-origin-hacked
     volumes:
       - ./config:/eodo
     network_mode: host
