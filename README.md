@@ -92,27 +92,6 @@ docker build -t eodo:latest .
 docker run -d --network=host --name eodo eodo:latest
 ```
 
-浏览器访问 `http://localhost:54321` 进行配置。
-
-### 📚 文档说明
-
-- [升级功能详细说明](UPGRADE_FEATURES.md) - 查看所有新功能和改进的详细说明
-- [GitHub Actions 构建指南](GITHUB_ACTIONS_GUIDE.md) - 了解自动化构建和部署流程
-
-### 🔧 高级配置
-
-#### 环境变量
-- `EODO_PORT`: Web 界面端口 (默认: 54321)
-- `EODO_CONFIG_PATH`: 配置文件路径 (默认: /eodo/config.yaml)
-- `EODO_LOG_LEVEL`: 日志级别 (DEBUG/INFO/WARNING/ERROR)
-
-#### 配置文件
-配置文件支持以下主要选项：
-- `IPv6SelectMode`: IPv6选择模式 (manual/auto)
-- `IntervalMin`: 检查间隔时间（分钟）
-- `IPv6ValidityCheck`: 是否启用IPv6连通性检查
-- `SelectIface`: 指定网络接口
-
 ### 🚀 快速开始
 
 1. **Docker 部署**（推荐）:
@@ -134,8 +113,29 @@ docker run -d --network=host --name eodo eodo:latest
 
 5. **启动服务**: 点击"立即执行任务"开始自动更新
 
+### 浏览器访问 `http://localhost:54321` 进行配置。
+
 ### WEB 界面
 ![img.png](img.png)
+
+### 📚 文档说明
+
+- [升级功能详细说明](UPGRADE_FEATURES.md) - 查看所有新功能和改进的详细说明
+- [GitHub Actions 构建指南](GITHUB_ACTIONS_GUIDE.md) - 了解自动化构建和部署流程
+
+### 🔧 高级配置
+
+#### 环境变量
+- `EODO_PORT`: Web 界面端口 (默认: 54321)
+- `EODO_CONFIG_PATH`: 配置文件路径 (默认: /eodo/config.yaml)
+- `EODO_LOG_LEVEL`: 日志级别 (DEBUG/INFO/WARNING/ERROR)
+
+#### 配置文件
+配置文件支持以下主要选项：
+- `IPv6SelectMode`: IPv6选择模式 (manual/auto)
+- `IntervalMin`: 检查间隔时间（分钟）
+- `IPv6ValidityCheck`: 是否启用IPv6连通性检查
+- `SelectIface`: 指定网络接口
 
 ### 🔒 安全说明
 
