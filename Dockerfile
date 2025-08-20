@@ -7,6 +7,12 @@ WORKDIR /app
 # 复制依赖文件
 COPY requirements.txt ./
 
+# 安装编译依赖
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # 安装依赖
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
