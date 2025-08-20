@@ -2,8 +2,8 @@ version: '3.8'
 
 services:
   edgeone-origin-hacked:
-    build: mayflydestiny/edgeone-origin-hacked:latest
-    container_name: edgeone-origin-hacked
+    build: mayflydestiny/edgeone-dogroup:latest
+    container_name: edgeone-dogroup
     volumes:
       - ./config:/eodo
     network_mode: host

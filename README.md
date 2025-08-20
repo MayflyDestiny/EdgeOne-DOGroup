@@ -1,7 +1,7 @@
 # EdgeOne Dynamic Origin
 
 <img src="https://img.shields.io/docker/automated/tsund/tianchi_docker_practice.svg"/>
-<img src="https://img.shields.io/docker/image-size/mayflydestiny/edgeone-origin-hacked"/>
+<img src="https://img.shields.io/docker/image-size/mayflydestiny/edgeone-dogroup"/>
 
 
 EdgeOne 是腾讯云的边缘安全加速平台。该脚本为其提供动态更新源站组 IP 的功能。
@@ -64,20 +64,20 @@ EdgeOne 是腾讯云的边缘安全加速平台。该脚本为其提供动态更
 ##### 使用预构建镜像
 ```bash
 # 拉取最新镜像
-docker pull mayflydestiny/edgeone-origin-hacked:latest
+docker pull mayflydestiny/edgeone-dogroup:latest
 
 # 运行容器
 docker run -d \
   --name eodo \
   --network=host \
   -v /path/to/config:/eodo \
-  mayflydestiny/edgeone-origin-hacked:latest
+  mayflydestiny/edgeone-dogroup:latest
 ```
 
 ##### 使用 Docker Compose (推荐)
 ```bash
 # 下载 docker-compose.yml
-wget https://raw.githubusercontent.com/MayflyDestiny/EdgeOne-Origin-Hacked/refs/heads/main/docker-compose.yml
+wget https://raw.githubusercontent.com/MayflyDestiny/EdgeOne-DOGroup/refs/heads/main/docker-compose.yml
 
 # 启动服务
 docker-compose up -d
@@ -93,9 +93,6 @@ docker run -d --network=host --name eodo eodo:latest
 ```
 
 浏览器访问 `http://localhost:54321` 进行配置。
-
-### WEB 界面
-![img.png](img.png)
 
 ### 📚 文档说明
 
@@ -120,7 +117,7 @@ docker run -d --network=host --name eodo eodo:latest
 
 1. **Docker 部署**（推荐）:
    ```bash
-   docker run -d --name eodo --network=host mayflydestiny/edgeone-origin-hacked:latest
+   docker run -d --name eodo --network=host mayflydestiny/edgeone-dogroup:latest
    ```
 
 2. **访问 Web 界面**: http://localhost:54321
@@ -136,6 +133,9 @@ docker run -d --network=host --name eodo eodo:latest
    - 启用连通性验证
 
 5. **启动服务**: 点击"立即执行任务"开始自动更新
+
+### WEB 界面
+![img.png](img.png)
 
 ### 🔒 安全说明
 

@@ -37,7 +37,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: itnotf/edgeone-dynamic-origin
+  IMAGE_NAME: mayflydestiny/edgeone-dogroup
 
 jobs:
   build-and-push:
@@ -74,7 +74,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: mayflydestiny/edgeone-origin-hacked
+        images: mayflydestiny/edgeone-dogroup
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -108,7 +108,7 @@ jobs:
       if: github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        image-ref: mayflydestiny/edgeone-dogroup:latest
         format: 'sarif'
         output: 'trivy-results.sarif'
 
@@ -122,7 +122,7 @@ jobs:
       if: github.event_name != 'pull_request'
       uses: anchore/sbom-action@v0
       with:
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        image: mayflydestiny/edgeone-dogroup:latest
         format: spdx-json
         output-file: sbom.spdx.json
 
@@ -144,7 +144,7 @@ jobs:
         docker run --rm -d --name test-container \
           -p 54321:54321 \
           -v /tmp/test-config:/eodo \
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          mayflydestiny/edgeone-dogroup:latest
         
         # Wait for container to start
         sleep 10
@@ -159,7 +159,7 @@ jobs:
       if: success()
       run: |
         echo "✅ Docker image built and tested successfully!"
-        echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "📦 Image: mayflydestiny/edgeone-dogroup"
         echo "🏷️ Tags: ${{ steps.meta.outputs.tags }}"
 
     - name: Notify on failure
