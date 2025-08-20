@@ -7,12 +7,27 @@ on:
       - master
     tags:
       - 'v*'
+    paths:                       # 只在这些文件变更时触发
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - 'src/eodo/app.py'
+      - 'src/eodo/static/index.html'
+
   pull_request:
     branches:
       - main
       - master
+    paths:                       # PR 同理
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - 'src/eodo/app.py'
+      - 'src/eodo/static/index.html'
+
   release:
     types: [created, published]
+
   workflow_dispatch:
     inputs:
       tag:
