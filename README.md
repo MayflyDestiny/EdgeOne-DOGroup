@@ -60,20 +60,20 @@ EdgeOne 是腾讯云的边缘安全加速平台。该脚本为其提供动态更
 ##### 使用预构建镜像
 ```bash
 # 拉取最新镜像
-docker pull itnotf/edgeone-dynamic-origin:latest
+docker pull mayflydestiny/edgeone-origin-hacked:latest
 
 # 运行容器
 docker run -d \
   --name eodo \
   --network=host \
   -v /path/to/config:/eodo \
-  itnotf/edgeone-dynamic-origin:latest
+  mayflydestiny/edgeone-origin-hacked:latest
 ```
 
 ##### 使用 Docker Compose (推荐)
 ```bash
 # 下载 docker-compose.yml
-wget https://raw.githubusercontent.com/username/repo/main/docker-compose.yml
+wget https://raw.githubusercontent.com/MayflyDestiny/EdgeOne-Origin-Hacked/refs/heads/main/docker-compose.yml
 
 # 启动服务
 docker-compose up -d
@@ -116,7 +116,7 @@ docker run -d --network=host --name eodo eodo:latest
 
 1. **Docker 部署**（推荐）:
    ```bash
-   docker run -d --name eodo --network=host itnotf/edgeone-dynamic-origin:latest
+   docker run -d --name eodo --network=host mayflydestiny/edgeone-origin-hacked:latest
    ```
 
 2. **访问 Web 界面**: http://localhost:54321

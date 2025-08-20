@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  eodo:
-    build: .
+  edgeone-origin-hacked:
+    build: mayflydestiny/edgeone-origin-hacked:latest
     container_name: edgeone-origin-hacked
     volumes:
       - ./config:/eodo
