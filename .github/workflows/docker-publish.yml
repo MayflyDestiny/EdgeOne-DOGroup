@@ -135,4 +135,3 @@ jobs:
           tags: ${{ needs.build.outputs.full-tag }}
           labels: ${{ needs.build.outputs.full-tag }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
