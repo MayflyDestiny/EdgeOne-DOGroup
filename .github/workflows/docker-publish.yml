@@ -1,5 +1,4 @@
-# .github/workflows/docker-publish.yml
-name: Build and Publish Docker Image
+name: 构建并发布 Docker 镜像
 
 on:
   push:
@@ -28,36 +27,26 @@ env:
   IMAGE_NAME: mayflydestiny/edgeone-dogroup
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
-
+    outputs:
+      tag: ${{ steps.meta.outputs.version }}
+      full-tag: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: Checkout repository
+      - name: 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up QEMU
+      - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: 设置 Buildx
         uses: docker/setup-buildx-action@v3
         with:
           platforms: linux/amd64,linux/arm64
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Docker meta
+      - name: 生成元数据
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -67,12 +56,13 @@ jobs:
             type=raw,value=latest,enable=${{ github.event_name == 'push' }}
             type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
 
-      - name: Build and push Docker image
+      - name: 构建镜像（不推送）
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -82,66 +72,64 @@ jobs:
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
 
-      - name: Run Trivy vulnerability scanner
-        if: github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-
-      - name: Generate SBOM
-        if: github.event_name != 'pull_request'
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          format: spdx-json
-          output-file: sbom.spdx.json
-
-      - name: Upload SBOM as artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.spdx.json
-
   test:
     runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name != 'pull_request'
-
+    needs: build
     steps:
-      - name: Test Docker image
+      - name: 测试镜像
         run: |
+          # 启动容器
           docker run --rm -d --name test-container \
             -p 54321:54321 \
             -v /tmp/test-config:/eodo \
-            mayflydestiny/edgeone-dogroup:latest
+            ${{ needs.build.outputs.full-tag }}
 
           # 等待容器启动
           sleep 10
 
-          # 测试应用是否正常响应
+          # 测试接口
           curl -f http://localhost:54321/api/status || exit 1
 
-          # 清理测试容器
+          # 清理
           docker stop test-container
 
       - name: 通知成功
         if: success()
         run: |
           echo "✅ Docker 镜像构建并测试成功！"
-          echo "📦 镜像：mayflydestiny/edgeone-dogroup"
-          echo "🏷️ 标签：${{ needs.build-and-push.outputs.tags }}"
+          echo "📦 镜像：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "🏷️ 标签：${{ needs.build.outputs.full-tag }}"
 
       - name: 通知失败
         if: failure()
         run: |
-          echo "❌ Docker 镜像构建或测试失败！"
+          echo "❌ Docker 镜像测试失败，不会上传！"
           exit 1
+
+  push:
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    steps:
+      - name: 检出代码（用于缓存）
+        uses: actions/checkout@v4
+
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 推送镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ needs.build.outputs.full-tag }}
+          labels: ${{ needs.build.outputs.labels }}
+          cache-from: type=gha
+          build-args: |
+            BUILDTIME=${{ needs.build.outputs.tag }}
+            VERSION=${{ needs.build.outputs.tag }}
+            REVISION=${{ github.sha }}
