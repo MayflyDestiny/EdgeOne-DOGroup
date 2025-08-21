@@ -20,10 +20,10 @@ env:
   IMAGE_NAME: mayflydestiny/edgeone-dogroup
 
 jobs:
-  build:
+    build:
     runs-on: ubuntu-latest
     outputs:
-      full-tag: ${{ steps.meta.outputs.tags }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -102,7 +102,7 @@ jobs:
         run: |
           echo "✅ Docker 镜像构建并测试成功！"
           echo "📦 镜像：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "🏷️ 标签：${{ needs.build.outputs.full-tag }}"
+          echo "🏷️ 标签：${{ needs.build.outputs.tags }}"
 
       - name: 通知失败
         if: failure()
@@ -146,4 +146,4 @@ jobs:
         run: |
           echo "🚀 镜像已成功推送！"
           echo "🔗 地址：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "🏷️ 标签：${{ needs.build.outputs.full-tag }}"
+          echo "🏷️ 标签：${{ needs.build.outputs.tags }}"
