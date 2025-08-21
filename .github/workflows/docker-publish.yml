@@ -20,7 +20,7 @@ env:
   IMAGE_NAME: mayflydestiny/edgeone-dogroup
 
 jobs:
-    build:
+  build:
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.meta.outputs.tags }}
