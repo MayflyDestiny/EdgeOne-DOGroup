@@ -131,6 +131,16 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: 重新生成元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
+
       - name: 构建并推送多平台镜像
         uses: docker/build-push-action@v5
         with:
@@ -138,12 +148,12 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ needs.build.outputs.tags }}
-          labels: ${{ needs.build.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
 
       - name: 推送成功通知
         run: |
           echo "🚀 镜像已成功推送！"
           echo "🔗 地址：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "🏷️ 标签：${{ needs.build.outputs.tags }}"
+          echo "🏷️ 标签：${{ steps.meta.outputs.tags }}"
