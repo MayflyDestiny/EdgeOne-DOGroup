@@ -138,8 +138,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ needs.build.outputs.full-tag }}
-          labels: ${{ needs.build.outputs.full-tag }}
+          tags: ${{ needs.build.outputs.tags }}
+          labels: ${{ needs.build.outputs.tags }}
           cache-from: type=gha
 
       - name: 推送成功通知
