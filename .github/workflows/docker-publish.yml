@@ -11,19 +11,14 @@ on:
         required: false
         default: ''
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   REGISTRY: docker.io
   IMAGE_NAME: mayflydestiny/edgeone-dogroup
+  IMAGE_TAG: ${{ inputs.version != '' && format('v{0}', inputs.version) || 'latest' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -36,17 +31,8 @@ jobs:
       - name: 设置 Buildx
         uses: docker/setup-buildx-action@v3
         with:
+          driver: docker-container
           platforms: linux/amd64,linux/arm64
-
-      - name: 生成元数据
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          flavor: latest=false
-          tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
-            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
 
       - name: 构建单平台镜像（用于测试）
         uses: docker/build-push-action@v5
@@ -57,9 +43,7 @@ jobs:
           push: false
           load: true
           tags: local-test:latest
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: 导出镜像为 tar
         run: |
@@ -102,7 +86,7 @@ jobs:
         run: |
           echo "✅ Docker 镜像构建并测试成功！"
           echo "📦 镜像：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "🏷️ 标签：${{ needs.build.outputs.tags }}"
+          echo "🏷️ 标签：${{ env.IMAGE_TAG }}"
 
       - name: 通知失败
         if: failure()
@@ -131,16 +115,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 重新生成元数据
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          flavor: latest=false
-          tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
-            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
-
       - name: 构建并推送多平台镜像
         uses: docker/build-push-action@v5
         with:
@@ -148,12 +122,10 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
 
       - name: 推送成功通知
         run: |
           echo "🚀 镜像已成功推送！"
-          echo "🔗 地址：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "🏷️ 标签：${{ steps.meta.outputs.tags }}"
+          echo "🔗 地址：${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
