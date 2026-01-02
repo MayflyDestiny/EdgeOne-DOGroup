@@ -361,6 +361,8 @@ class Dingtalk:
         self.webhook = webhook
 
     def notice_no_public_ipv6(self):
+        if not self.webhook:
+            return
         requests.post(
             self.webhook,
             json={
@@ -372,6 +374,8 @@ class Dingtalk:
             })
 
     def notice_eo_result(self, site_tag:str, zone_id:str, public_ipv6:List[str], message:str):
+        if not self.webhook:
+            return
         ipv6_text = [f"- {item}\n" for item in public_ipv6]
 
         requests.post(
@@ -388,7 +392,8 @@ class Dingtalk:
         )
 
     def notice_dns_result(self, domain:str, public_ipv6:List[str], message:str):
-
+        if not self.webhook:
+            return
         requests.post(
             self.webhook,
             json={
@@ -596,8 +601,8 @@ def run_task_in_background():
         cron_logger.info(f"[{task_id}] 结束")
         last_status.update({"id": task_id, "result": "结束"})
     except Exception as e:
-        logger.debug(e)
-        cron_logger.error(f"[{task_id}] 异常")
+        logger.error(f"[{task_id}] 任务执行发生异常: {e}", exc_info=True)
+        cron_logger.error(f"[{task_id}] 异常: {e}")
         last_status.update({"id": task_id, "result": "异常"})
 
 def load_interval(default_interval=15):
