@@ -401,6 +401,69 @@ class Dingtalk:
                 }, "msgtype": "markdown"}
         )
 
+# =================== IPv6 Matcher ===================
+class IPv6Matcher:
+    @staticmethod
+    def get_interface_id(ip_str):
+        """获取IPv6地址的后64位（Interface ID）"""
+        try:
+            ip = ipaddress.IPv6Address(ip_str)
+            # 转为整数，取后64位
+            return int(ip) & ((1 << 64) - 1)
+        except:
+            return None
+
+    @staticmethod
+    def is_compressed_format(ip_str):
+        """判断是否为压缩格式（含有::，通常表示较短的稳定地址）"""
+        try:
+            ip = ipaddress.IPv6Address(ip_str)
+            return "::" in ip.compressed
+        except:
+            return False
+
+    @staticmethod
+    def find_best_match(old_ip, candidates):
+        """在候选列表中寻找最匹配old_ip的地址"""
+        if not candidates:
+            return None
+            
+        # 1. 尝试完全匹配
+        if old_ip in candidates:
+            return old_ip
+            
+        # 2. 尝试后缀匹配 (Interface ID相同)
+        old_iid = IPv6Matcher.get_interface_id(old_ip)
+        if old_iid is not None:
+            for c in candidates:
+                if IPv6Matcher.get_interface_id(c) == old_iid:
+                    return c
+        
+        # 3. 尝试格式偏好匹配
+        old_is_compressed = IPv6Matcher.is_compressed_format(old_ip)
+        
+        # 优先选择格式一致的（压缩 vs 非压缩）
+        matching_candidates = [c for c in candidates 
+                               if IPv6Matcher.is_compressed_format(c) == old_is_compressed]
+        
+        if matching_candidates:
+            return matching_candidates[0]
+            
+        # 4. 无法匹配格式，返回第一个候选
+        return candidates[0] if candidates else None
+
+def update_config_selected_ips(new_ips):
+    """更新配置文件中的选中IP"""
+    try:
+        config = read_config()
+        config['SelectedIPv6Addresses'] = list(new_ips)
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+        logger.info(f"已更新配置文件中的 SelectedIPv6Addresses: {new_ips}")
+    except Exception as e:
+        logger.error(f"更新配置文件失败: {e}")
+
+
 # =================== 任务处理 ===================
 def update_task(task_id=""):
     config = read_config()
@@ -410,9 +473,44 @@ def update_task(task_id=""):
     
     # 根据选择模式确定使用的IPv6地址
     if ipv6_select_mode == "manual" and selected_ipv6_addresses:
-        # 手动选择模式：使用配置中指定的IPv6地址，跳过连通性检查
-        public_ipv6 = set(selected_ipv6_addresses)
-        logger.info(f"[{task_id}] 使用手动选择的 IPV6 地址：{",".join(public_ipv6)}")
+        # 手动选择模式：智能匹配新地址
+        iptool = IPv6Tool(config.get("SelectIface"), task_id, ipv6_validity_check)
+        
+        # 获取所有候选公网IP（不强制依赖连通性检查，保持手动模式的灵活性）
+        current_live_ips = iptool.get_all_public_ipv6_list(config.get("SelectIface", ""))
+        
+        if not current_live_ips:
+            logger.warning(f"[{task_id}] 手动模式：无法获取任何公网IPv6地址，将沿用旧配置。")
+            public_ipv6 = set(selected_ipv6_addresses)
+        else:
+            final_selected_ips = set()
+            ips_changed = False
+            
+            for old_ip in selected_ipv6_addresses:
+                # 记录格式偏好以便排查
+                pref_type = "短格式/压缩" if IPv6Matcher.is_compressed_format(old_ip) else "长格式/完整"
+                logger.info(f"[{task_id}] 正在为 {old_ip} 寻找新地址 (偏好: {pref_type})")
+                
+                match = IPv6Matcher.find_best_match(old_ip, current_live_ips)
+                if match:
+                    final_selected_ips.add(match)
+                    if match != old_ip:
+                        logger.info(f"[{task_id}] 地址已刷新: {old_ip} -> {match} (基于格式偏好自动选择)")
+                        ips_changed = True
+                    else:
+                        logger.info(f"[{task_id}] 地址未变化: {match}")
+                else:
+                    logger.warning(f"[{task_id}] 无法为 {old_ip} 找到匹配的新地址")
+            
+            # 如果发生了地址变更，更新配置文件并使用新地址
+            if ips_changed:
+                update_config_selected_ips(final_selected_ips)
+                public_ipv6 = final_selected_ips
+            else:
+                public_ipv6 = set(selected_ipv6_addresses)
+                
+            logger.info(f"[{task_id}] 使用手动选择(智能刷新)的 IPV6 地址：{",".join(public_ipv6)}")
+
     else:
         # 自动选择模式：优先尝试连通性检查，失败则使用所有检测到的地址
         iptool = IPv6Tool(config.get("SelectIface"), task_id, ipv6_validity_check)
