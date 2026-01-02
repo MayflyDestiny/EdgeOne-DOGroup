@@ -514,7 +514,7 @@ def update_task(task_id=""):
             else:
                 public_ipv6 = set(selected_ipv6_addresses)
                 
-            logger.info(f"[{task_id}] 使用手动选择(智能刷新)的 IPV6 地址：{",".join(public_ipv6)}")
+            logger.info(f"[{task_id}] 最终确认使用的 IPV6 地址：{",".join(public_ipv6)}")
 
     else:
         # 自动选择模式：优先尝试连通性检查，失败则使用所有检测到的地址
