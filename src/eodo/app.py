@@ -40,6 +40,9 @@ print(STATIC_PATH)
 print(f"Config path: {CONFIG_PATH}")
 print(f"Log file: {LOG_FILE}")
 
+# 全局配置锁，防止并发读写冲突
+# 使用 RLock (可重入锁)，允许同一线程多次获取锁，方便函数复用
+config_lock = threading.RLock()
 
 # =================== 日志与配置 ===================
 def setup_logging(file="task"):
@@ -82,8 +85,10 @@ def read_config():
         if not os.path.exists(CONFIG_PATH):
             init_default_config()
         
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
-            return yaml.safe_load(file)
+        with config_lock:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
+                config = yaml.safe_load(file)
+                return config if config is not None else {}
     except Exception as exc:
         logger.error(f"配置文件读取失败: {exc}")
         return {}
@@ -112,8 +117,9 @@ def init_default_config():
             'SelectedIPv6Addresses': []
         }
         
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            yaml.dump(default_config, f, allow_unicode=True, default_flow_style=False)
+        with config_lock:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                yaml.dump(default_config, f, allow_unicode=True, default_flow_style=False)
         
         logger.info(f"已创建默认配置文件: {CONFIG_PATH}")
     except Exception as e:
@@ -460,10 +466,17 @@ class IPv6Matcher:
 def update_config_selected_ips(new_ips):
     """更新配置文件中的选中IP"""
     try:
-        config = read_config()
-        config['SelectedIPv6Addresses'] = list(new_ips)
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+        # 这里需要注意，read_config内部已经加了锁，但我们这里是一个读-改-写的组合操作
+        # 为了保证原子性，我们应该在这里加锁，并且手动读取（或者让read_config不加锁，拆分逻辑）
+        # 简单起见，我们在这里加锁，并调用read_config（锁是可重入的吗？threading.Lock不是可重入的！）
+        # 所以我们需要小心。Python的threading.RLock是可重入锁。
+        # 我们将config_lock改为RLock。
+        
+        with config_lock:
+            config = read_config()
+            config['SelectedIPv6Addresses'] = list(new_ips)
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
         logger.info(f"已更新配置文件中的 SelectedIPv6Addresses: {new_ips}")
     except Exception as e:
         logger.error(f"更新配置文件失败: {e}")
@@ -607,14 +620,18 @@ def run_task_in_background():
 
 def load_interval(default_interval=15):
     if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            try:
-                config = yaml.safe_load(f)
-                interval = int(config.get("IntervalMin", 15))
-                if interval < 1: interval = 1
-                return interval
-            except Exception as e:
-                logger.debug(e)
+        with config_lock:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                try:
+                    config = yaml.safe_load(f)
+                    # 如果config是None，说明文件为空
+                    if config is None:
+                        return default_interval
+                    interval = int(config.get("IntervalMin", 15))
+                    if interval < 1: interval = 1
+                    return interval
+                except Exception as e:
+                    logger.debug(e)
     return default_interval  # 默认值
 
 class TaskScheduler:
@@ -741,20 +758,25 @@ def api_detect_ipv6():
 def get_config():
     if not os.path.exists(CONFIG_PATH):
         return {}
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    with config_lock:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+            return config if config is not None else {}
 
 @app.post('/api/config')
 async def post_config(request: Request):
     data = await request.json()
-    # 读取现有配置
-    existing_config = read_config()
-    # 合并配置，新数据覆盖现有配置中的对应字段
-    existing_config.update(data)
-    # 允许配置 IntervalMin
-    interval = data.get("IntervalMin", None)
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(existing_config, f, allow_unicode=True)
+    
+    with config_lock:
+        # 读取现有配置
+        existing_config = read_config()
+        # 合并配置，新数据覆盖现有配置中的对应字段
+        existing_config.update(data)
+        # 允许配置 IntervalMin
+        interval = data.get("IntervalMin", None)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            yaml.dump(existing_config, f, allow_unicode=True)
+            
     # 如果带了 IntervalMin，同步到调度器
     if interval is not None:
         try:
@@ -796,17 +818,20 @@ async def set_interval(request: Request):
     # 修改调度器周期
     scheduler.restart_scheduler(val)
     # 保存到配置文件
-    config = {}
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            try:
-                config = yaml.safe_load(f) or {}
-            except Exception as e:
-                logger.debug(e)
-                config = {}
-    config["IntervalMin"] = val
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(config, f, allow_unicode=True)
+    
+    with config_lock:
+        config = {}
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                try:
+                    config = yaml.safe_load(f) or {}
+                except Exception as e:
+                    logger.debug(e)
+                    config = {}
+        config["IntervalMin"] = val
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            yaml.dump(config, f, allow_unicode=True)
+            
     return {"msg": "已设置周期间隔"}
 
 @app.get('/api/service-status')
